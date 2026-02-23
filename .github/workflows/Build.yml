@@ -1,0 +1,259 @@
+name: Build Kernel
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_source:
+        description: Kernel Source Code
+        required: true
+        type: choice
+        options:
+          - LineageOS
+          - crdroidandroid
+          - Sukimoka
+          - PixelOS-Devices
+
+      module_source:
+        description: Kernel Module Source Code
+        required: true
+        type: choice
+        options:
+          - LineageOS
+          - crdroidandroid
+          - Sukimoka
+          - PixelOS-Devices
+          
+      kernel_branch:
+        description: Kernel Branch
+        required: true
+        type: string
+        default: ""
+        
+      ksu_type:
+        description: "KernelSU Version"
+        required: true
+        type: choice
+        options:
+          - KernelSU-Official
+          - KernelSU-Official-susfs
+          - KernelSU-Next-susfs
+          - ReSukiSU-susfs
+
+      kernel_name:
+        description: "Custom Kernel Name"
+        required: false
+        type: string
+        default: ""
+          
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      checks: read
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup SWAP
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 16
+          
+      - name: Install build dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y \
+          bc bison flex \
+          libssl-dev \
+          libelf-dev \
+          libdw-dev \
+          build-essential \
+          lz4 \
+          git \
+          python3 \
+          curl \
+          dwarves \
+          cpio \
+          gcc-aarch64-linux-gnu
+          
+      - name: Clone Kernel Source and Download AOSP Clang
+        run: |
+          git clone --depth=1 -b ${{ inputs.kernel_branch }} https://github.com/${{ inputs.kernel_source }}/android_kernel_oneplus_sm8650.git sm8650
+          git clone --depth=1 -b ${{ inputs.kernel_branch }} https://github.com/${{ inputs.module_source }}/android_kernel_oneplus_sm8650-modules.git sm8650-modules
+
+          mkdir -p toolchains/clang-r563880c
+          cd toolchains
+          curl -LO https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android16-qpr2-release/clang-r563880c.tar.gz
+          tar -xf "clang-r563880c.tar.gz" -C clang-r563880c
+
+      - name: Compile Kernel
+        run: |
+          CLANG_ROOT="${GITHUB_WORKSPACE}/toolchains/clang-r563880c/bin"
+          export PATH="${CLANG_ROOT}:$PATH"
+          export ARCH=arm64
+          export SUBARCH=arm64
+          export LLVM=1
+          export LLVM_IAS=1
+          export CC="${CLANG_ROOT}/clang"
+          export CXX="${CLANG_ROOT}/clang++"
+          export HOSTCC="${CLANG_ROOT}/clang"
+          export HOSTCXX="${CLANG_ROOT}/clang++"
+          export LD="${CLANG_ROOT}/ld.lld"
+          export AR="${CLANG_ROOT}/llvm-ar"
+          export NM="${CLANG_ROOT}/llvm-nm"
+          export OBJCOPY="${CLANG_ROOT}/llvm-objcopy"
+          export OBJDUMP="${CLANG_ROOT}/llvm-objdump"
+          export STRIP="${CLANG_ROOT}/llvm-strip"
+
+          cd sm8650
+
+          KSU_TYPE="${{ inputs.ksu_type }}"
+
+          if [[ "${KSU_TYPE}" == "KernelSU-Official-susfs" ]]; then
+            curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
+
+          elif [[ "${KSU_TYPE}" == "KernelSU-Official" ]]; then
+            curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
+
+          elif [[ "${KSU_TYPE}" == "KernelSU-Next-susfs" ]]; then
+            curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/refs/heads/dev-susfs/kernel/setup.sh" | bash -s dev-susfs
+
+          elif [[ "${KSU_TYPE}" == "ReSukiSU-susfs" ]]; then
+            curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
+
+          fi
+          
+          if [[ "${{ inputs.ksu_type }}" == *susfs ]]; then
+            git clone -b gki-android14-6.1 https://gitlab.com/simonpunk/susfs4ksu.git susfs
+            cd susfs
+            cp ./kernel_patches/50_add_susfs_in_gki-android14-6.1.patch ..
+            cp ./kernel_patches/fs/* ../fs/
+            cp ./kernel_patches/include/linux/* ../include/linux/
+            cd ..
+            patch -p1 < 50_add_susfs_in_gki-android14-6.1.patch
+          fi
+            
+          if [[ "${KSU_TYPE}" == "KernelSU-Official-susfs" ]]; then
+            echo "正在为原版KernelSU添加补丁..."
+            cp ./susfs/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
+            cd ./KernelSU
+            patch -p1 < 10_enable_susfs_for_ksu.patch || true
+            cd ..
+          fi
+         
+          if [[ "${KSU_TYPE}" == *susfs ]]; then
+            echo "CONFIG_KSU_SUSFS=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=n" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_KSU_SUSFS_SUS_MAP=y" >> arch/arm64/configs/gki_defconfig
+          fi
+
+          touch ./.scmversion
+          sed -i "s|CONFIG_MODULE_SIG_PROTECT=y|CONFIG_MODULE_SIG_PROTECT=n|" arch/arm64/configs/gki_defconfig
+          echo "CONFIG_TMPFS_XATTR=y" >> arch/arm64/configs/gki_defconfig
+
+          # Apply custom kernel name if provided
+          if [[ -n "${{ inputs.kernel_name }}" ]]; then
+            CUSTOM_NAME="${{ inputs.kernel_name }}"
+            if [[ "${CUSTOM_NAME}" != -* ]]; then
+              CUSTOM_NAME="-${CUSTOM_NAME}"
+            fi
+            echo "CONFIG_LOCALVERSION=\"${CUSTOM_NAME}\"" >> arch/arm64/configs/gki_defconfig
+            echo "Kernel name set to: ${CUSTOM_NAME}"
+          fi
+
+          make O=out gki_defconfig vendor/pineapple_GKI.config vendor/oplus/pineapple_GKI.config
+          make -j2 O=out Image
+
+      - name: Make AnyKernel3
+        run: |
+          KSU_TYPE="${{ inputs.ksu_type }}"
+          if [[ "${KSU_TYPE}" == "KernelSU-Official" ]]; then
+            ZIP_PREFIX="KernelSU-Official"
+          elif [[ "${KSU_TYPE}" == "KernelSU-Official-susfs" ]]; then
+            ZIP_PREFIX="KernelSU-Official-SUSFS"
+          elif [[ "${KSU_TYPE}" == "KernelSU-Next-susfs" ]]; then
+            ZIP_PREFIX="KernelSU-Next-SUSFS"
+          elif [[ "${KSU_TYPE}" == "ReSukiSU-susfs" ]]; then
+            ZIP_PREFIX="ReSukiSU-SUSFS"
+          fi
+          ZIP_NAME="${ZIP_PREFIX}-$(date -u +"%m%d")"
+          git clone --depth=1 https://github.com/Kernel-SU/AnyKernel3.git
+          cp sm8650/out/arch/arm64/boot/Image AnyKernel3/Image
+          cd AnyKernel3
+          zip -r9 ../"${ZIP_NAME}.zip" * -x .git
+
+      - name: Upload ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kernel_ZIP
+          path: "*.zip"
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      actions: read
+
+    steps:
+      - name: Download ZIP artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Kernel_ZIP
+          path: ./release_zips
+
+      - name: Set release env
+        run: |
+          TIME="$(date -u +'%y%m%d%H%M%S')"
+          TIME_FORM="$(date -u +'%Y-%m-%d %H:%M:%S') UTC"
+          echo "TIME=$TIME" >> $GITHUB_ENV
+          echo "TIME_FORM=$TIME_FORM" >> $GITHUB_ENV
+
+          KSU_TYPE="${{ inputs.ksu_type }}"
+          if [[ "${KSU_TYPE}" == "KernelSU-Official" ]]; then
+            KSU_TYPENAME="KernelSU (Official)"
+          elif [[ "${KSU_TYPE}" == "KernelSU-Official-susfs" ]]; then
+            KSU_TYPENAME="KernelSU Official + SUSFS"
+          elif [[ "${KSU_TYPE}" == "KernelSU-Next-susfs" ]]; then
+            KSU_TYPENAME="KernelSU-Next + SUSFS"
+          elif [[ "${KSU_TYPE}" == "ReSukiSU-susfs" ]]; then
+            KSU_TYPENAME="ReSukiSU + SUSFS"
+          fi
+          echo "KSU_TYPENAME=${KSU_TYPENAME}" >> $GITHUB_ENV
+
+          BRANCH="${{ inputs.kernel_branch }}"
+          SOURCE="${{ inputs.kernel_source }}"
+          echo "REL_TAG=${SOURCE}-${BRANCH}-${{ inputs.ksu_type }}-${TIME}" >> $GITHUB_ENV
+          echo "REL_TITLE=${SOURCE} ${BRANCH} | ${KSU_TYPENAME}" >> $GITHUB_ENV
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "${{ env.REL_TAG }}"
+          name: "${{ env.REL_TITLE }}"
+          body: |
+            ### SM8650 OPlus Kernel Build
+
+            | Field | Value |
+            |---|---|
+            | Source | ${{ inputs.kernel_source }} |
+            | Branch | ${{ inputs.kernel_branch }} |
+            | Clang | clang-r563880c |
+            | KernelSU | ${{ env.KSU_TYPENAME }} |
+            | Built at | ${{ env.TIME_FORM }} |
+
+            **Manager downloads:**
+            - KernelSU (Official): [tiann/KernelSU](https://github.com/tiann/KernelSU/releases)
+            - KernelSU-Next: [KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next/releases)
+            - ReSukiSU: [ReSukiSU](https://github.com/ReSukiSU/ReSukiSU/releases)
+          draft: false
+          prerelease: false
+          files: release_zips/*.zip
+
