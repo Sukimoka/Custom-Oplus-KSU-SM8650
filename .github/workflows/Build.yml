@@ -35,6 +35,7 @@ on:
         type: choice
         options:
           - KernelSU-Official
+          - ReSukiSU
           - KernelSU-Official-susfs
           - KernelSU-Next-susfs
           - ReSukiSU-susfs
@@ -110,13 +111,16 @@ jobs:
           KSU_TYPE="${{ inputs.ksu_type }}"
 
           if [[ "${KSU_TYPE}" == "KernelSU-Official-susfs" ]]; then
-            curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
+            curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s v3.2.1
 
           elif [[ "${KSU_TYPE}" == "KernelSU-Official" ]]; then
-            curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
+            curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s v3.2.1
 
           elif [[ "${KSU_TYPE}" == "KernelSU-Next-susfs" ]]; then
             curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/refs/heads/dev-susfs/kernel/setup.sh" | bash -s dev-susfs
+
+          elif [[ "${KSU_TYPE}" == "ReSukiSU" ]]; then
+            curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
 
           elif [[ "${KSU_TYPE}" == "ReSukiSU-susfs" ]]; then
             curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
@@ -156,8 +160,7 @@ jobs:
           touch ./.scmversion
           sed -i "s|CONFIG_MODULE_SIG_PROTECT=y|CONFIG_MODULE_SIG_PROTECT=n|" arch/arm64/configs/gki_defconfig
           echo "CONFIG_TMPFS_XATTR=y" >> arch/arm64/configs/gki_defconfig
-
-          # Apply custom kernel name if provided
+          
           if [[ -n "${{ inputs.kernel_name }}" ]]; then
             CUSTOM_NAME="${{ inputs.kernel_name }}"
             if [[ "${CUSTOM_NAME}" != -* ]]; then
@@ -179,6 +182,8 @@ jobs:
             ZIP_PREFIX="KernelSU-Official-SUSFS"
           elif [[ "${KSU_TYPE}" == "KernelSU-Next-susfs" ]]; then
             ZIP_PREFIX="KernelSU-Next-SUSFS"
+          elif [[ "${KSU_TYPE}" == "ReSukiSU" ]]; then
+            ZIP_PREFIX="ReSukiSU"
           elif [[ "${KSU_TYPE}" == "ReSukiSU-susfs" ]]; then
             ZIP_PREFIX="ReSukiSU-SUSFS"
           fi
@@ -223,6 +228,8 @@ jobs:
             KSU_TYPENAME="KernelSU Official + SUSFS"
           elif [[ "${KSU_TYPE}" == "KernelSU-Next-susfs" ]]; then
             KSU_TYPENAME="KernelSU-Next + SUSFS"
+          elif [[ "${KSU_TYPE}" == "ReSukiSU" ]]; then
+            KSU_TYPENAME="ReSukiSU"
           elif [[ "${KSU_TYPE}" == "ReSukiSU-susfs" ]]; then
             KSU_TYPENAME="ReSukiSU + SUSFS"
           fi
@@ -256,4 +263,3 @@ jobs:
           draft: false
           prerelease: false
           files: release_zips/*.zip
-
