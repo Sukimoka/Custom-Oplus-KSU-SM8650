@@ -111,10 +111,10 @@ jobs:
           KSU_TYPE="${{ inputs.ksu_type }}"
 
           if [[ "${KSU_TYPE}" == "KernelSU-Official-susfs" ]]; then
-            curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s
+            curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
 
           elif [[ "${KSU_TYPE}" == "KernelSU-Official" ]]; then
-            curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s
+            curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
 
           elif [[ "${KSU_TYPE}" == "KernelSU-Next-susfs" ]]; then
             curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/refs/heads/dev-susfs/kernel/setup.sh" | bash -s dev-susfs
