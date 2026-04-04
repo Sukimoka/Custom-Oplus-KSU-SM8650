@@ -134,16 +134,24 @@ jobs:
             cp ./kernel_patches/fs/* ../fs/
             cp ./kernel_patches/include/linux/* ../include/linux/
             cd ..
-            patch -p1 < 50_add_susfs_in_gki-android14-6.1.patch
-          fi
             
-          if [[ "${KSU_TYPE}" == "KernelSU-Official-susfs" ]]; then
-            echo "正在为原版KernelSU添加补丁..."
-            cp ./susfs/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
-            cd ./KernelSU
-            patch -p1 < 10_enable_susfs_for_ksu.patch || true
-            cd ..
+            patch -p1 < 50_add_susfs_in_gki-android14-6.1.patch || true
+
+            if ! grep -qF '#include <linux/dma-buf.h>' ./fs/proc/base.c; then
+              sed -i '/#include <linux\/cpufreq_times.h>/a #include <linux\/dma-buf.h>' ./fs/proc/base.c
+            fi
+            if grep -q 'susfs_is_current_proc_umounted' ./fs/proc/base.c && ! grep -qF '#include <linux/susfs.h>' ./fs/proc/base.c; then
+              sed -i '/#include <linux\/dma-buf.h>/a #include <linux\/susfs.h>' ./fs/proc/base.c
+            fi
+            if grep -q 'DEFAULT_KSU_MNT_ID\|susfs_mnt_id_ida' ./fs/namespace.c && ! grep -qF '#include <linux/susfs_def.h>' ./fs/namespace.c; then
+              sed -i 's|#include <linux/mnt_idmapping.h>|#include <linux/mnt_idmapping.h>\n#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT\n#include <linux/susfs_def.h>\n#endif|' ./fs/namespace.c
+              
+              if ! grep -q 'extern bool susfs_is_current_ksu_domain' ./fs/namespace.c; then
+                sed -i 's|#include "internal.h"|#include "internal.h"\n\n#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT\nextern bool susfs_is_current_ksu_domain(void);\nextern bool susfs_is_sdcard_android_data_decrypted __read_mostly;\n\n#define CL_COPY_MNT_NS BIT(25)\n\nstatic DEFINE_IDA(susfs_mnt_id_ida);\nstatic DEFINE_IDA(susfs_mnt_group_ida);\n\n#endif|' ./fs/namespace.c
+              fi
+            fi
           fi
+
          
           if [[ "${KSU_TYPE}" == *susfs ]]; then
             echo "CONFIG_KSU_SUSFS=y" >> arch/arm64/configs/gki_defconfig
