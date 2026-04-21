@@ -125,26 +125,28 @@ jobs:
             if [ -f fs/namespace.c ] && ! grep -q "linux/susfs_def.h" fs/namespace.c; then
               echo "检测到 namespace.c 补丁未完全应用，正在手动修复头部声明..."
               
+              # 清理可能重定义的变量
               sed -i '/extern bool susfs_is_sdcard_android_data_decrypted/d' ./fs/namespace.c
               sed -i '/extern bool susfs_is_current_ksu_domain/d' ./fs/namespace.c
               
-              # 关键修复点：下面的每一行（包括 # 开头的行和最后的 EOF）都必须缩进
-              cat <<'EOF' > /tmp/susfs_fix.txt
-              #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-              #include <linux/susfs_def.h>
-              extern bool susfs_is_current_ksu_domain(void);
-              #include <linux/jump_label.h>
-              DECLARE_STATIC_KEY_FALSE(susfs_set_sdcard_android_data_decrypted_key_false);
+              # 使用 printf 逐行写入，彻底避免 EOF 缩进导致的语法错误
+              printf '%s\n' \
+                '#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT' \
+                '#include <linux/susfs_def.h>' \
+                'extern bool susfs_is_current_ksu_domain(void);' \
+                '#include <linux/jump_label.h>' \
+                'DECLARE_STATIC_KEY_FALSE(susfs_set_sdcard_android_data_decrypted_key_false);' \
+                '' \
+                '#ifndef CL_COPY_MNT_NS' \
+                '#define CL_COPY_MNT_NS BIT(25)' \
+                '#endif' \
+                '' \
+                'static DEFINE_IDA(susfs_mnt_id_ida);' \
+                'static DEFINE_IDA(susfs_mnt_group_ida);' \
+                '#endif' \
+                > /tmp/susfs_fix.txt
 
-              #ifndef CL_COPY_MNT_NS
-              #define CL_COPY_MNT_NS BIT(25)
-              #endif
-
-              static DEFINE_IDA(susfs_mnt_id_ida);
-              static DEFINE_IDA(susfs_mnt_group_ida);
-              #endif
-              EOF
-
+              # 将生成的声明块插入到 internal.h 引用之后
               sed -i '/#include "internal.h"/r /tmp/susfs_fix.txt' ./fs/namespace.c
               rm -f /tmp/susfs_fix.txt
               echo "✅ namespace.c 头部声明修复完成"
