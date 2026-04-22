@@ -123,30 +123,25 @@ jobs:
             patch -p1 < 50_add_susfs_in_gki-android14-6.1.patch || true
 
             if [ -f fs/namespace.c ] && ! grep -q "linux/susfs_def.h" fs/namespace.c; then
-              echo "检测到 namespace.c 补丁未完全应用，正在手动修复头部声明..."
+              echo "正在修复声明..."
               
-              # 清理可能重定义的变量
               sed -i '/extern bool susfs_is_sdcard_android_data_decrypted/d' ./fs/namespace.c
               sed -i '/extern bool susfs_is_current_ksu_domain/d' ./fs/namespace.c
               
-              # 使用 printf 逐行写入，彻底避免 EOF 缩进导致的语法错误
-              printf '%s\n' \
-                '#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT' \
-                '#include <linux/susfs_def.h>' \
-                'extern bool susfs_is_current_ksu_domain(void);' \
-                '#include <linux/jump_label.h>' \
-                'DECLARE_STATIC_KEY_FALSE(susfs_set_sdcard_android_data_decrypted_key_false);' \
-                '' \
-                '#ifndef CL_COPY_MNT_NS' \
-                '#define CL_COPY_MNT_NS BIT(25)' \
-                '#endif' \
-                '' \
-                'static DEFINE_IDA(susfs_mnt_id_ida);' \
-                'static DEFINE_IDA(susfs_mnt_group_ida);' \
-                '#endif' \
-                > /tmp/susfs_fix.txt
+              echo '#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT' > /tmp/susfs_fix.txt
+              echo '#include <linux/susfs_def.h>' >> /tmp/susfs_fix.txt
+              echo 'extern bool susfs_is_current_ksu_domain(void);' >> /tmp/susfs_fix.txt
+              echo '#include <linux/jump_label.h>' >> /tmp/susfs_fix.txt
+              echo 'DECLARE_STATIC_KEY_FALSE(susfs_set_sdcard_android_data_decrypted_key_false);' >> /tmp/susfs_fix.txt
+              echo '' >> /tmp/susfs_fix.txt
+              echo '#ifndef CL_COPY_MNT_NS' >> /tmp/susfs_fix.txt
+              echo '#define CL_COPY_MNT_NS BIT(25)' >> /tmp/susfs_fix.txt
+              echo '#endif' >> /tmp/susfs_fix.txt
+              echo '' >> /tmp/susfs_fix.txt
+              echo 'static DEFINE_IDA(susfs_mnt_id_ida);' >> /tmp/susfs_fix.txt
+              echo 'static DEFINE_IDA(susfs_mnt_group_ida);' >> /tmp/susfs_fix.txt
+              echo '#endif' >> /tmp/susfs_fix.txt
 
-              # 将生成的声明块插入到 internal.h 引用之后
               sed -i '/#include "internal.h"/r /tmp/susfs_fix.txt' ./fs/namespace.c
               rm -f /tmp/susfs_fix.txt
               echo "✅ namespace.c 头部声明修复完成"
