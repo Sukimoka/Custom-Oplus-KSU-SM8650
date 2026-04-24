@@ -76,18 +76,29 @@ jobs:
           
           patch -p1 < 50_add_susfs_in_gki-android14-6.1.patch || true
 
-          if ! grep -qF '#include <linux/dma-buf.h>' ./fs/proc/base.c; then
-            sed -i '/#include <linux\/cpufreq_times.h>/a #include <linux\/dma-buf.h>' ./fs/proc/base.c
-          fi
-          if grep -q 'susfs_is_current_proc_umounted' ./fs/proc/base.c && ! grep -qF '#include <linux/susfs.h>' ./fs/proc/base.c; then
-            sed -i '/#include <linux\/dma-buf.h>/a #include <linux\/susfs.h>' ./fs/proc/base.c
-          fi
-          if grep -q 'DEFAULT_KSU_MNT_ID\|susfs_mnt_id_ida' ./fs/namespace.c && ! grep -qF '#include <linux/susfs_def.h>' ./fs/namespace.c; then
-            sed -i 's|#include <linux/mnt_idmapping.h>|#include <linux/mnt_idmapping.h>\n#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT\n#include <linux/susfs_def.h>\n#endif|' ./fs/namespace.c
-            
-            if ! grep -q 'extern bool susfs_is_current_ksu_domain' ./fs/namespace.c; then
-              sed -i 's|#include "internal.h"|#include "internal.h"\n\n#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT\nextern bool susfs_is_current_ksu_domain(void);\nextern bool susfs_is_sdcard_android_data_decrypted __read_mostly;\n\n#define CL_COPY_MNT_NS BIT(25)\n\nstatic DEFINE_IDA(susfs_mnt_id_ida);\nstatic DEFINE_IDA(susfs_mnt_group_ida);\n\n#endif|' ./fs/namespace.c
-            fi
+          if [ -f fs/namespace.c ] && ! grep -q "linux/susfs_def.h" fs/namespace.c; then
+            echo "正在修复SUSFS"
+              
+            sed -i '/extern bool susfs_is_sdcard_android_data_decrypted/d' ./fs/namespace.c
+            sed -i '/extern bool susfs_is_current_ksu_domain/d' ./fs/namespace.c
+              
+            echo '#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT' > /tmp/susfs_fix.txt
+            echo '#include <linux/susfs_def.h>' >> /tmp/susfs_fix.txt
+            echo 'extern bool susfs_is_current_ksu_domain(void);' >> /tmp/susfs_fix.txt
+            echo '#include <linux/jump_label.h>' >> /tmp/susfs_fix.txt
+            echo 'DECLARE_STATIC_KEY_FALSE(susfs_set_sdcard_android_data_decrypted_key_false);' >> /tmp/susfs_fix.txt
+            echo '' >> /tmp/susfs_fix.txt
+            echo '#ifndef CL_COPY_MNT_NS' >> /tmp/susfs_fix.txt
+            echo '#define CL_COPY_MNT_NS BIT(25)' >> /tmp/susfs_fix.txt
+            echo '#endif' >> /tmp/susfs_fix.txt
+            echo '' >> /tmp/susfs_fix.txt
+            echo 'static DEFINE_IDA(susfs_mnt_id_ida);' >> /tmp/susfs_fix.txt
+            echo 'static DEFINE_IDA(susfs_mnt_group_ida);' >> /tmp/susfs_fix.txt
+            echo '#endif' >> /tmp/susfs_fix.txt
+
+            sed -i '/#include "internal.h"/r /tmp/susfs_fix.txt' ./fs/namespace.c
+            rm -f /tmp/susfs_fix.txt
+            echo "SUSFS修复完成"
           fi
 
           echo "CONFIG_KSU_SUSFS=y" >> arch/arm64/configs/gki_defconfig
@@ -137,6 +148,7 @@ jobs:
           echo "CONFIG_IP_SET_LIST_SET=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_IP6_NF_NAT=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_IP6_NF_TARGET_MASQUERADE=y" >> arch/arm64/configs/gki_defconfig
+          
           echo "Applying IPv6_NAT Fix..."
            curl -LSsO https://raw.githubusercontent.com/Numbersf/Action-Build/SukiSU-Ultra/patches/IPv6_NAT_FIX.patch
            patch -p1 -F 3 < IPv6_NAT_FIX.patch || true
