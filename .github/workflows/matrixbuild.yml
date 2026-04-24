@@ -86,7 +86,7 @@ jobs:
             echo '#include <linux/susfs_def.h>' >> /tmp/susfs_fix.txt
             echo 'extern bool susfs_is_current_ksu_domain(void);' >> /tmp/susfs_fix.txt
             echo '#include <linux/jump_label.h>' >> /tmp/susfs_fix.txt
-            echo 'DECLARE_STATIC_KEY_FALSE(susfs_set_sdcard_android_data_decrypted_key_false);' >> /tmp/susfs_fix.txt
+            echo 'DECLARE_STATIC_KEY_FALSE(susfs_is_sdcard_android_data_not_decrypted);' >> /tmp/susfs_fix.txt
             echo '' >> /tmp/susfs_fix.txt
             echo '#ifndef CL_COPY_MNT_NS' >> /tmp/susfs_fix.txt
             echo '#define CL_COPY_MNT_NS BIT(25)' >> /tmp/susfs_fix.txt
@@ -200,7 +200,7 @@ jobs:
         run: |
           TIME_FORM="$(date -u +'%Y-%m-%d %H:%M:%S') UTC"
           echo "TIME_FORM=$TIME_FORM" >> $GITHUB_ENV
-          VERSION=$((${{ github.run_number }} - 1))
+          VERSION=$((${{ github.run_number }} - 2))
           REL_TAG="FloranKernel-R${VERSION}"
           echo "REL_TAG=$REL_TAG" >> $GITHUB_ENV
           echo "REL_TITLE=Floran Kernel Build Release！" >> $GITHUB_ENV
