@@ -100,12 +100,6 @@ jobs:
             rm -f /tmp/susfs_fix.txt
             echo "SUSFS修复完成"
           fi
-       
-             if [ -f drivers/kernelsu/runtime/ksud_integration.c ]; then
-            echo "正在修复定义"
-            if ! grep -q "DEFINE_STATIC_KEY_FALSE(ksu_init_rc_hook_key_false)" drivers/kernelsu/runtime/ksud_integration.c; then
-              sed -i '/#include "ksud.h"/a #include <linux/jump_label.h>\nDEFINE_STATIC_KEY_FALSE(ksu_init_rc_hook_key_false);' drivers/kernelsu/runtime/ksud_integration.c
-          fi
 
           echo "CONFIG_KSU_SUSFS=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> arch/arm64/configs/gki_defconfig
