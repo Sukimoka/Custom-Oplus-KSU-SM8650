@@ -24,6 +24,7 @@ on:
           - KernelSU-Official-susfs
           - KernelSU-Next-susfs
           - ReSukiSU-susfs
+          - None
 
       netfilter:
         description: "Enable IPSET & IPv6_NAT"
@@ -220,7 +221,7 @@ jobs:
           fi
 
           make O=out gki_defconfig vendor/pineapple_GKI.config vendor/oplus/pineapple_GKI.config
-          make -j2 O=out Image
+          make -j$(nproc) O=out Image
 
       - name: Make AnyKernel3
         run: |
@@ -236,6 +237,8 @@ jobs:
             ZIP_PREFIX="ReSukiSU"
           elif [[ "${{ inputs.ksu_type }}" == "ReSukiSU-susfs" ]]; then
             ZIP_PREFIX="ReSukiSU-SUSFS"
+          elif [[ "${{ inputs.ksu_type }}" == "None" ]]; then
+            ZIP_PREFIX="Non-KSU"
           fi
           ZIP_NAME="${ZIP_PREFIX}-$(date -u +"%m%d")"
           git clone --depth=1 https://github.com/Kernel-SU/AnyKernel3.git
@@ -283,6 +286,8 @@ jobs:
             KSU_TYPENAME="ReSukiSU"
           elif [[ "${{ inputs.ksu_type }}" == "ReSukiSU-susfs" ]]; then
             KSU_TYPENAME="ReSukiSU + SUSFS"
+          elif [[ "${{ inputs.ksu_type }}" == "None" ]]; then
+            KSU_TYPENAME="Non-KSU"
           fi
           echo "KSU_TYPENAME=${KSU_TYPENAME}" >> $GITHUB_ENV
 
