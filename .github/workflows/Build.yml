@@ -24,6 +24,7 @@ on:
           - KernelSU-Official-susfs
           - KernelSU-Next-susfs
           - ReSukiSU-susfs
+          - None
 
       netfilter:
         description: "Enable IPSET & IPv6_NAT"
@@ -123,7 +124,7 @@ jobs:
             patch -p1 < 50_add_susfs_in_gki-android14-6.1.patch || true
 
             if [ -f fs/namespace.c ] && ! grep -q "linux/susfs_def.h" fs/namespace.c; then
-              echo "正在修复声明..."
+              echo "正在修复SUSFS"
               
               sed -i '/extern bool susfs_is_sdcard_android_data_decrypted/d' ./fs/namespace.c
               sed -i '/extern bool susfs_is_current_ksu_domain/d' ./fs/namespace.c
@@ -131,29 +132,26 @@ jobs:
               echo '#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT' > /tmp/susfs_fix.txt
               echo '#include <linux/susfs_def.h>' >> /tmp/susfs_fix.txt
               echo 'extern bool susfs_is_current_ksu_domain(void);' >> /tmp/susfs_fix.txt
-              echo '#include <linux/jump_label.h>' >> /tmp/susfs_fix.txt
-              echo 'DECLARE_STATIC_KEY_FALSE(susfs_set_sdcard_android_data_decrypted_key_false);' >> /tmp/susfs_fix.txt
+              echo 'extern struct static_key_true susfs_is_sdcard_android_data_not_decrypted;' >> /tmp/susfs_fix.txt
               echo '' >> /tmp/susfs_fix.txt
               echo '#ifndef CL_COPY_MNT_NS' >> /tmp/susfs_fix.txt
               echo '#define CL_COPY_MNT_NS BIT(25)' >> /tmp/susfs_fix.txt
               echo '#endif' >> /tmp/susfs_fix.txt
-              echo '' >> /tmp/susfs_fix.txt
-              echo 'static DEFINE_IDA(susfs_mnt_id_ida);' >> /tmp/susfs_fix.txt
-              echo 'static DEFINE_IDA(susfs_mnt_group_ida);' >> /tmp/susfs_fix.txt
               echo '#endif' >> /tmp/susfs_fix.txt
 
               sed -i '/#include "internal.h"/r /tmp/susfs_fix.txt' ./fs/namespace.c
               rm -f /tmp/susfs_fix.txt
-              echo "✅ namespace.c 头部声明修复完成"
+              echo "SUSFS修复完成"
             fi
           fi
 
+         
           if [[ "${{ inputs.ksu_type }}" == *susfs ]]; then
             echo "CONFIG_KSU_SUSFS=y" >> arch/arm64/configs/gki_defconfig
             echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> arch/arm64/configs/gki_defconfig
             echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> arch/arm64/configs/gki_defconfig
             echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> arch/arm64/configs/gki_defconfig
-            echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=n" >> arch/arm64/configs/gki_defconfig
             echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> arch/arm64/configs/gki_defconfig
             echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> arch/arm64/configs/gki_defconfig
             echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> arch/arm64/configs/gki_defconfig
@@ -163,11 +161,16 @@ jobs:
           touch ./.scmversion
           sed -i "s|CONFIG_MODULE_SIG_PROTECT=y|CONFIG_MODULE_SIG_PROTECT=n|" arch/arm64/configs/gki_defconfig
           echo "CONFIG_TMPFS_XATTR=y" >> arch/arm64/configs/gki_defconfig
+     
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> arch/arm64/configs/gki_defconfig
 
           if [[ "${{ inputs.ccm }}" == "true" ]]; then
             echo "CONFIG_TCP_CONG_ADVANCED=y" >> arch/arm64/configs/gki_defconfig
             echo "CONFIG_TCP_CONG_BBR=y" >> arch/arm64/configs/gki_defconfig
             echo "CONFIG_NET_SCH_FQ=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_TCP_CONG_BIC=n" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_TCP_CONG_WESTWOOD=n" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_TCP_CONG_HTCP=n" >> arch/arm64/configs/gki_defconfig
             echo "CONFIG_IP_ECN=y" >> arch/arm64/configs/gki_defconfig
             echo "CONFIG_TCP_ECN=y" >> arch/arm64/configs/gki_defconfig
             echo "CONFIG_IPV6_ECN=y" >> arch/arm64/configs/gki_defconfig
@@ -180,6 +183,22 @@ jobs:
             echo "CONFIG_NETFILTER_XT_SET=y" >> arch/arm64/configs/gki_defconfig
             echo "CONFIG_IP_SET=y" >> arch/arm64/configs/gki_defconfig
             echo "CONFIG_IP_SET_MAX=65534" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_IP_SET_BITMAP_IP=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_IP_SET_BITMAP_IPMAC=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_IP_SET_BITMAP_PORT=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_IP_SET_HASH_IP=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_IP_SET_HASH_IPMARK=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_IP_SET_HASH_IPPORT=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_IP_SET_HASH_IPPORTIP=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_IP_SET_HASH_IPPORTNET=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_IP_SET_HASH_IPMAC=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_IP_SET_HASH_MAC=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_IP_SET_HASH_NETPORTNET=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_IP_SET_HASH_NET=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_IP_SET_HASH_NETNET=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_IP_SET_HASH_NETPORT=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_IP_SET_HASH_NETIFACE=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_IP_SET_LIST_SET=y" >> arch/arm64/configs/gki_defconfig
             echo "CONFIG_IP6_NF_NAT=y" >> arch/arm64/configs/gki_defconfig
             echo "CONFIG_IP6_NF_TARGET_MASQUERADE=y" >> arch/arm64/configs/gki_defconfig
           fi
@@ -196,11 +215,11 @@ jobs:
               CUSTOM_NAME="-${CUSTOM_NAME}"
             fi
             echo "CONFIG_LOCALVERSION=\"${CUSTOM_NAME}\"" >> arch/arm64/configs/gki_defconfig
+            echo "Kernel name set to: ${CUSTOM_NAME}"
           fi
 
           make O=out gki_defconfig vendor/pineapple_GKI.config vendor/oplus/pineapple_GKI.config
-          make -j2 O=out Image
-
+          make -j$(nproc) O=out Image
 
       - name: Make AnyKernel3
         run: |
@@ -216,6 +235,8 @@ jobs:
             ZIP_PREFIX="ReSukiSU"
           elif [[ "${{ inputs.ksu_type }}" == "ReSukiSU-susfs" ]]; then
             ZIP_PREFIX="ReSukiSU-SUSFS"
+          elif [[ "${{ inputs.ksu_type }}" == "None" ]]; then
+            ZIP_PREFIX="Non-KSU"
           fi
           ZIP_NAME="${ZIP_PREFIX}-$(date -u +"%m%d")"
           git clone --depth=1 https://github.com/Kernel-SU/AnyKernel3.git
@@ -263,6 +284,8 @@ jobs:
             KSU_TYPENAME="ReSukiSU"
           elif [[ "${{ inputs.ksu_type }}" == "ReSukiSU-susfs" ]]; then
             KSU_TYPENAME="ReSukiSU + SUSFS"
+          elif [[ "${{ inputs.ksu_type }}" == "None" ]]; then
+            KSU_TYPENAME="Non-KSU"
           fi
           echo "KSU_TYPENAME=${KSU_TYPENAME}" >> $GITHUB_ENV
 
