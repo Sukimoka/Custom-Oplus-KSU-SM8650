@@ -203,6 +203,12 @@ jobs:
             echo "CONFIG_IP6_NF_TARGET_MASQUERADE=y" >> arch/arm64/configs/gki_defconfig
           fi
           
+          if [[ "${{ inputs.rom_source }}" == "YAAP" && "${{ inputs.netfilter }}" == "true" ]]; then
+            echo "CONFIG_NETFILTER_XT_MATCH_SET=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_NF_CONNTRACK_PROCFS=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_NETFILTER_NETLINK=y" >> arch/arm64/configs/gki_defconfig
+          fi
+          
           if [[ "${{ inputs.netfilter }}" == "true" ]]; then
             echo "Applying IPv6_NAT Fix..."
             curl -LSsO https://raw.githubusercontent.com/Numbersf/Action-Build/SukiSU-Ultra/patches/IPv6_NAT_FIX.patch
