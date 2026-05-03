@@ -228,8 +228,8 @@ jobs:
           
       - name: Verify config
         run: |
-        
-            cd sm8650
+       
+          cd sm8650
             
           echo "=== BBR ==="
           grep -E "CONFIG_TCP_CONG_BBR|CONFIG_TCP_CONG_ADVANCED" out/.config || echo "❌ BBR NOT SET"
