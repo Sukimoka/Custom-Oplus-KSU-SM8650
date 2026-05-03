@@ -113,7 +113,6 @@ jobs:
             cp ./kernel_patches/fs/* ../fs/
             cp ./kernel_patches/include/linux/* ../include/linux/
             cd ..
-
             patch -p1 < 50_add_susfs_in_gki-android14-6.1.patch || true
 
             if [ -f fs/namespace.c ] && ! grep -q "linux/susfs_def.h" fs/namespace.c; then
@@ -175,75 +174,94 @@ jobs:
           echo "CONFIG_TMPFS_XATTR=y"                  >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y"  >> arch/arm64/configs/gki_defconfig
 
+          if [[ "${{ inputs.netfilter }}" == "true" ]]; then
+            echo "==> Writing IPSET configs to gki_defconfig SOURCE"
+            sed -i '/CONFIG_IP_SET/d'                    arch/arm64/configs/gki_defconfig
+            sed -i '/CONFIG_NETFILTER_XT_SET/d'          arch/arm64/configs/gki_defconfig
+            sed -i '/CONFIG_NETFILTER_XT_MATCH_ADDRTYPE/d' arch/arm64/configs/gki_defconfig
+            sed -i '/CONFIG_IP6_NF_NAT/d'                arch/arm64/configs/gki_defconfig
+            sed -i '/CONFIG_IP6_NF_TARGET_MASQUERADE/d'  arch/arm64/configs/gki_defconfig
+
+            {
+              echo "CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y"
+              echo "CONFIG_NETFILTER_XT_SET=y"
+              echo "CONFIG_IP_SET=y"
+              echo "CONFIG_IP_SET_MAX=65534"
+              echo "CONFIG_IP_SET_BITMAP_IP=y"
+              echo "CONFIG_IP_SET_BITMAP_IPMAC=y"
+              echo "CONFIG_IP_SET_BITMAP_PORT=y"
+              echo "CONFIG_IP_SET_HASH_IP=y"
+              echo "CONFIG_IP_SET_HASH_IPMARK=y"
+              echo "CONFIG_IP_SET_HASH_IPPORT=y"
+              echo "CONFIG_IP_SET_HASH_IPPORTIP=y"
+              echo "CONFIG_IP_SET_HASH_IPPORTNET=y"
+              echo "CONFIG_IP_SET_HASH_IPMAC=y"
+              echo "CONFIG_IP_SET_HASH_MAC=y"
+              echo "CONFIG_IP_SET_HASH_NETPORTNET=y"
+              echo "CONFIG_IP_SET_HASH_NET=y"
+              echo "CONFIG_IP_SET_HASH_NETNET=y"
+              echo "CONFIG_IP_SET_HASH_NETPORT=y"
+              echo "CONFIG_IP_SET_HASH_NETIFACE=y"
+              echo "CONFIG_IP_SET_LIST_SET=y"
+              echo "CONFIG_IP6_NF_NAT=y"
+              echo "CONFIG_IP6_NF_TARGET_MASQUERADE=y"
+            } >> arch/arm64/configs/gki_defconfig
+          fi
+
           make O=out gki_defconfig vendor/pineapple_GKI.config vendor/oplus/pineapple_GKI.config
 
           CFG=out/.config
 
+          echo "========== [STAGE-1] after defconfig+fragments =========="
+          grep -E "^(# )?CONFIG_(IP_SET|NETFILTER_XT_SET|IP6_NF_NAT)" "$CFG" || echo "NONE"
+
           if [[ "${{ inputs.ccm }}" == "true" ]]; then
-            echo "==> Try enabling BBR & FQ"
             ./scripts/config --file "$CFG" \
-              -e TCP_CONG_ADVANCED \
-              -e TCP_CONG_BBR \
-              -e NET_SCH_FQ \
-              -d TCP_CONG_BIC \
-              -d TCP_CONG_WESTWOOD \
-              -d TCP_CONG_HTCP \
+              -e TCP_CONG_ADVANCED -e TCP_CONG_BBR -e NET_SCH_FQ \
+              -d TCP_CONG_BIC -d TCP_CONG_WESTWOOD -d TCP_CONG_HTCP \
               -e IP_NF_TARGET_ECN || true
           fi
 
           if [[ "${{ inputs.netfilter }}" == "true" ]]; then
-            echo "==> Forcing IPSET & IPv6_NAT to =y"
             ./scripts/config --file "$CFG" \
-              -e NETFILTER_XT_MATCH_ADDRTYPE \
-              -e NETFILTER_XT_SET \
-              -e IP_SET \
+              -e NETFILTER_XT_MATCH_ADDRTYPE -e NETFILTER_XT_SET -e IP_SET \
               --set-val IP_SET_MAX 65534 \
-              -e IP_SET_BITMAP_IP \
-              -e IP_SET_BITMAP_IPMAC \
-              -e IP_SET_BITMAP_PORT \
-              -e IP_SET_HASH_IP \
-              -e IP_SET_HASH_IPMARK \
-              -e IP_SET_HASH_IPPORT \
-              -e IP_SET_HASH_IPPORTIP \
-              -e IP_SET_HASH_IPPORTNET \
-              -e IP_SET_HASH_IPMAC \
-              -e IP_SET_HASH_MAC \
-              -e IP_SET_HASH_NETPORTNET \
-              -e IP_SET_HASH_NET \
-              -e IP_SET_HASH_NETNET \
-              -e IP_SET_HASH_NETPORT \
-              -e IP_SET_HASH_NETIFACE \
-              -e IP_SET_LIST_SET \
-              -e IP6_NF_NAT \
-              -e IP6_NF_TARGET_MASQUERADE
+              -e IP_SET_BITMAP_IP -e IP_SET_BITMAP_IPMAC -e IP_SET_BITMAP_PORT \
+              -e IP_SET_HASH_IP -e IP_SET_HASH_IPMARK -e IP_SET_HASH_IPPORT \
+              -e IP_SET_HASH_IPPORTIP -e IP_SET_HASH_IPPORTNET -e IP_SET_HASH_IPMAC \
+              -e IP_SET_HASH_MAC -e IP_SET_HASH_NETPORTNET -e IP_SET_HASH_NET \
+              -e IP_SET_HASH_NETNET -e IP_SET_HASH_NETPORT -e IP_SET_HASH_NETIFACE \
+              -e IP_SET_LIST_SET -e IP6_NF_NAT -e IP6_NF_TARGET_MASQUERADE
           fi
 
           make O=out olddefconfig
 
+          echo "========== [STAGE-2] after olddefconfig =========="
+          grep -E "^(# )?CONFIG_(IP_SET|NETFILTER_XT_SET|IP6_NF_NAT)" "$CFG" || echo "NONE"
+
           if [[ "${{ inputs.netfilter }}" == "true" ]]; then
-            echo "==> Verifying IPSET-related CONFIGs in $CFG"
             fail=0
-            required_y=( IP_SET NETFILTER_XT_SET IP_SET_HASH_NET IP_SET_HASH_IP IP_SET_BITMAP_IP IP_SET_LIST_SET IP6_NF_NAT IP6_NF_TARGET_MASQUERADE NETFILTER_XT_MATCH_ADDRTYPE )
-            for s in "${required_y[@]}"; do
+            for s in IP_SET NETFILTER_XT_SET IP_SET_HASH_NET IP6_NF_NAT IP6_NF_TARGET_MASQUERADE; do
               if ! grep -q "^CONFIG_${s}=y" "$CFG"; then
-                actual="$(grep "CONFIG_${s}[= ]" "$CFG" || echo 'NOT SET')"
-                echo "::error::CONFIG_${s} 未启用为 y  ->  ${actual}"
+                echo "::error::CONFIG_${s} not =y"
                 fail=1
               fi
             done
-            if [[ "$fail" -ne 0 ]]; then
-              echo "==> IPSET 关键配置启用失败，终止构建。"
-              mkdir -p "${GITHUB_WORKSPACE}/diag"
-              cp "$CFG" "${GITHUB_WORKSPACE}/diag/.config.failed" || true
-              ls -la "${GITHUB_WORKSPACE}/diag/" || true
-              exit 1
-            fi
-            echo "==> IPSET CONFIGs OK."
+            [[ "$fail" -ne 0 ]] && exit 1
           fi
 
-          grep -E '^(CONFIG_IP_SET|CONFIG_NETFILTER_XT_SET|CONFIG_IP6_NF_NAT|CONFIG_TCP_CONG_BBR|CONFIG_NET_SCH_FQ)=' "$CFG" || true
-
           make -j$(nproc) O=out Image
+
+          echo "========== [STAGE-3] AFTER make Image, .config status =========="
+          grep -E "^(# )?CONFIG_(IP_SET|NETFILTER_XT_SET|IP6_NF_NAT)" "$CFG" || echo "NONE"
+
+          echo "========== [STAGE-4] embedded config_data.gz =========="
+          if [ -f out/kernel/config_data.gz ]; then
+            zcat out/kernel/config_data.gz | grep -E "^(# )?CONFIG_(IP_SET|NETFILTER_XT_SET|IP6_NF_NAT)" || echo "NONE in embedded"
+          else
+            echo "out/kernel/config_data.gz NOT FOUND, searching..."
+            find out -name "config_data*" -ls
+          fi
 
       - name: Make AnyKernel3
         run: |
