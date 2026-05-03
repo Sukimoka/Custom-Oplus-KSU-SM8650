@@ -84,182 +84,167 @@ jobs:
           curl -LO https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android16-qpr2-release/clang-r563880c.tar.gz
           tar -xf "clang-r563880c.tar.gz" -C clang-r563880c
 
-      - name: Compile Kernel
-        run: |
-          CLANG_ROOT="${GITHUB_WORKSPACE}/toolchains/clang-r563880c/bin"
-          export PATH="${CLANG_ROOT}:$PATH"
-          export ARCH=arm64
-          export SUBARCH=arm64
-          export LLVM=1
-          export LLVM_IAS=1
-          export CC=clang CXX=clang++ HOSTCC=clang HOSTCXX=clang++ LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip
+- name: Compile Kernel
+  run: |
+    CLANG_ROOT="${GITHUB_WORKSPACE}/toolchains/clang-r563880c/bin"
+    export PATH="${CLANG_ROOT}:$PATH"
+    export ARCH=arm64
+    export SUBARCH=arm64
+    export LLVM=1
+    export LLVM_IAS=1
+    export CC=clang CXX=clang++ HOSTCC=clang HOSTCXX=clang++ LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip
 
-          cd sm8650
+    cd sm8650
 
-          if [[ "${{ inputs.ksu_type }}" == KernelSU-Official* ]]; then
-            curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
-          elif [[ "${{ inputs.ksu_type }}" == KernelSU-Next-susfs ]]; then
-            curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/refs/heads/dev-susfs/kernel/setup.sh" | bash -s dev-susfs
-          elif [[ "${{ inputs.ksu_type }}" == KernelSU-Next ]]; then
-            curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/refs/heads/dev-susfs/kernel/setup.sh" | bash -s main
-          elif [[ "${{ inputs.ksu_type }}" == ReSukiSU* ]]; then
-            curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
-          fi
+    if [[ "${{ inputs.ksu_type }}" == KernelSU-Official* ]]; then
+      curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
+    elif [[ "${{ inputs.ksu_type }}" == KernelSU-Next-susfs ]]; then
+      curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/refs/heads/dev-susfs/kernel/setup.sh" | bash -s dev-susfs
+    elif [[ "${{ inputs.ksu_type }}" == KernelSU-Next ]]; then
+      curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/refs/heads/dev-susfs/kernel/setup.sh" | bash -s main
+    elif [[ "${{ inputs.ksu_type }}" == ReSukiSU* ]]; then
+      curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
+    fi
 
-          if [[ "${{ inputs.ksu_type }}" == *susfs ]]; then
-            git clone -b gki-android14-6.1 https://gitlab.com/simonpunk/susfs4ksu.git susfs
-            cd susfs
-            cp ./kernel_patches/50_add_susfs_in_gki-android14-6.1.patch ..
-            cp ./kernel_patches/fs/* ../fs/
-            cp ./kernel_patches/include/linux/* ../include/linux/
-            cd ..
+    if [[ "${{ inputs.ksu_type }}" == *susfs ]]; then
+      git clone -b gki-android14-6.1 https://gitlab.com/simonpunk/susfs4ksu.git susfs
+      cd susfs
+      cp ./kernel_patches/50_add_susfs_in_gki-android14-6.1.patch ..
+      cp ./kernel_patches/fs/* ../fs/
+      cp ./kernel_patches/include/linux/* ../include/linux/
+      cd ..
 
-            patch -p1 < 50_add_susfs_in_gki-android14-6.1.patch || true
+      patch -p1 < 50_add_susfs_in_gki-android14-6.1.patch || true
 
-            if [ -f fs/namespace.c ] && ! grep -q "linux/susfs_def.h" fs/namespace.c; then
-              echo "正在修复SUSFS"
-              sed -i '/extern bool susfs_is_sdcard_android_data_decrypted/d' ./fs/namespace.c
-              sed -i '/extern bool susfs_is_current_ksu_domain/d' ./fs/namespace.c
+      if [ -f fs/namespace.c ] && ! grep -q "linux/susfs_def.h" fs/namespace.c; then
+        echo "正在修复SUSFS"
+        sed -i '/extern bool susfs_is_sdcard_android_data_decrypted/d' ./fs/namespace.c
+        sed -i '/extern bool susfs_is_current_ksu_domain/d' ./fs/namespace.c
 
-              echo '#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT' > /tmp/susfs_fix.txt
-              echo '#include <linux/susfs_def.h>' >> /tmp/susfs_fix.txt
-              echo 'extern bool susfs_is_current_ksu_domain(void);' >> /tmp/susfs_fix.txt
-              echo 'extern struct static_key_true susfs_is_sdcard_android_data_not_decrypted;' >> /tmp/susfs_fix.txt
-              echo '' >> /tmp/susfs_fix.txt
-              echo '#ifndef CL_COPY_MNT_NS' >> /tmp/susfs_fix.txt
-              echo '#define CL_COPY_MNT_NS BIT(25)' >> /tmp/susfs_fix.txt
-              echo '#endif' >> /tmp/susfs_fix.txt
-              echo '#endif' >> /tmp/susfs_fix.txt
+        echo '#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT' > /tmp/susfs_fix.txt
+        echo '#include <linux/susfs_def.h>' >> /tmp/susfs_fix.txt
+        echo 'extern bool susfs_is_current_ksu_domain(void);' >> /tmp/susfs_fix.txt
+        echo 'extern struct static_key_true susfs_is_sdcard_android_data_not_decrypted;' >> /tmp/susfs_fix.txt
+        echo '' >> /tmp/susfs_fix.txt
+        echo '#ifndef CL_COPY_MNT_NS' >> /tmp/susfs_fix.txt
+        echo '#define CL_COPY_MNT_NS BIT(25)' >> /tmp/susfs_fix.txt
+        echo '#endif' >> /tmp/susfs_fix.txt
+        echo '#endif' >> /tmp/susfs_fix.txt
 
-              sed -i '/#include "internal.h"/r /tmp/susfs_fix.txt' ./fs/namespace.c
-              rm -f /tmp/susfs_fix.txt
-              echo "SUSFS修复完成"
-            fi
-          fi
+        sed -i '/#include "internal.h"/r /tmp/susfs_fix.txt' ./fs/namespace.c
+        rm -f /tmp/susfs_fix.txt
+        echo "SUSFS修复完成"
+      fi
+    fi
 
-          if [[ "${{ inputs.netfilter }}" == "true" ]]; then
-            echo "Applying IPv6_NAT Fix..."
-            curl -LSsO https://raw.githubusercontent.com/Numbersf/Action-Build/SukiSU-Ultra/patches/IPv6_NAT_FIX.patch
-            patch -p1 -F 3 < IPv6_NAT_FIX.patch || true
-          fi
+    if [[ "${{ inputs.netfilter }}" == "true" ]]; then
+      echo "Applying IPv6_NAT Fix..."
+      curl -LSsO https://raw.githubusercontent.com/Numbersf/Action-Build/SukiSU-Ultra/patches/IPv6_NAT_FIX.patch
+      patch -p1 -F 3 < IPv6_NAT_FIX.patch || true
+    fi
 
-          touch ./.scmversion
-          sed -i "s|CONFIG_MODULE_SIG_PROTECT=y|CONFIG_MODULE_SIG_PROTECT=n|" arch/arm64/configs/gki_defconfig
-          sed -i "s|CONFIG_MODULE_SIG=y|# CONFIG_MODULE_SIG is not set|" arch/arm64/configs/gki_defconfig
-          sed -i "/CONFIG_MODULE_SIG_FORCE/d" arch/arm64/configs/gki_defconfig
-          sed -i "/CONFIG_MODULE_SIG_ALL/d" arch/arm64/configs/gki_defconfig
-          echo "# CONFIG_MODULE_SIG_FORCE is not set" >> arch/arm64/configs/gki_defconfig
-          echo "# CONFIG_MODULE_SIG_ALL is not set"   >> arch/arm64/configs/gki_defconfig
+    touch ./.scmversion
+    sed -i "s|CONFIG_MODULE_SIG_PROTECT=y|CONFIG_MODULE_SIG_PROTECT=n|" arch/arm64/configs/gki_defconfig
+    sed -i "s|CONFIG_MODULE_SIG=y|# CONFIG_MODULE_SIG is not set|" arch/arm64/configs/gki_defconfig
+    sed -i "/CONFIG_MODULE_SIG_FORCE/d" arch/arm64/configs/gki_defconfig
+    sed -i "/CONFIG_MODULE_SIG_ALL/d" arch/arm64/configs/gki_defconfig
+    echo "# CONFIG_MODULE_SIG_FORCE is not set" >> arch/arm64/configs/gki_defconfig
+    echo "# CONFIG_MODULE_SIG_ALL is not set"   >> arch/arm64/configs/gki_defconfig
 
-          if [[ -n "${{ inputs.kernel_name }}" ]]; then
-            CUSTOM_NAME="${{ inputs.kernel_name }}"
-            if [[ "${CUSTOM_NAME}" != -* ]]; then
-              CUSTOM_NAME="-${CUSTOM_NAME}"
-            fi
-            echo "CONFIG_LOCALVERSION=\"${CUSTOM_NAME}\"" >> arch/arm64/configs/gki_defconfig
-            echo "Kernel name set to: ${CUSTOM_NAME}"
-          fi
+    if [[ -n "${{ inputs.kernel_name }}" ]]; then
+      CUSTOM_NAME="${{ inputs.kernel_name }}"
+      if [[ "${CUSTOM_NAME}" != -* ]]; then
+        CUSTOM_NAME="-${CUSTOM_NAME}"
+      fi
+      echo "CONFIG_LOCALVERSION=\"${CUSTOM_NAME}\"" >> arch/arm64/configs/gki_defconfig
+      echo "Kernel name set to: ${CUSTOM_NAME}"
+    fi
 
-          if [[ "${{ inputs.ksu_type }}" == *susfs ]]; then
-            echo "CONFIG_KSU_SUSFS=y"                              >> arch/arm64/configs/gki_defconfig
-            echo "CONFIG_KSU_SUSFS_SUS_PATH=y"                     >> arch/arm64/configs/gki_defconfig
-            echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y"                    >> arch/arm64/configs/gki_defconfig
-            echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y"                    >> arch/arm64/configs/gki_defconfig
-            echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=n"                  >> arch/arm64/configs/gki_defconfig
-            echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y"                   >> arch/arm64/configs/gki_defconfig
-            echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y"       >> arch/arm64/configs/gki_defconfig
-            echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y"  >> arch/arm64/configs/gki_defconfig
-            echo "CONFIG_KSU_SUSFS_SUS_MAP=y"                      >> arch/arm64/configs/gki_defconfig
-          fi
+    if [[ "${{ inputs.ksu_type }}" == *susfs ]]; then
+      echo "CONFIG_KSU_SUSFS=y"                              >> arch/arm64/configs/gki_defconfig
+      echo "CONFIG_KSU_SUSFS_SUS_PATH=y"                     >> arch/arm64/configs/gki_defconfig
+      echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y"                    >> arch/arm64/configs/gki_defconfig
+      echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y"                    >> arch/arm64/configs/gki_defconfig
+      echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=n"                  >> arch/arm64/configs/gki_defconfig
+      echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y"                   >> arch/arm64/configs/gki_defconfig
+      echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y"       >> arch/arm64/configs/gki_defconfig
+      echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y"  >> arch/arm64/configs/gki_defconfig
+      echo "CONFIG_KSU_SUSFS_SUS_MAP=y"                      >> arch/arm64/configs/gki_defconfig
+    fi
 
-          echo "CONFIG_TMPFS_XATTR=y"                  >> arch/arm64/configs/gki_defconfig
-          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y"  >> arch/arm64/configs/gki_defconfig
+    echo "CONFIG_TMPFS_XATTR=y"                  >> arch/arm64/configs/gki_defconfig
+    echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y"  >> arch/arm64/configs/gki_defconfig
 
-          make O=out gki_defconfig vendor/pineapple_GKI.config vendor/oplus/pineapple_GKI.config
+    make O=out gki_defconfig vendor/pineapple_GKI.config vendor/oplus/pineapple_GKI.config
 
-          CFG=out/.config
+    CFG=out/.config
 
-          if [[ "${{ inputs.ccm }}" == "true" ]]; then
-            echo "==> Forcing BBR & ECN to =y"
-            ./scripts/config --file "$CFG" \
-              -e TCP_CONG_ADVANCED \
-              -e TCP_CONG_BBR \
-              -e NET_SCH_FQ \
-              -d TCP_CONG_BIC \
-              -d TCP_CONG_WESTWOOD \
-              -d TCP_CONG_HTCP \
-              -e IP_ECN \
-              -e TCP_ECN \
-              -e IPV6_ECN \
-              -e IP_NF_TARGET_ECN
-          fi
+    if [[ "${{ inputs.ccm }}" == "true" ]]; then
+      echo "==> Try enabling BBR & FQ"
+      ./scripts/config --file "$CFG" \
+        -e TCP_CONG_ADVANCED \
+        -e TCP_CONG_BBR \
+        -e NET_SCH_FQ \
+        -d TCP_CONG_BIC \
+        -d TCP_CONG_WESTWOOD \
+        -d TCP_CONG_HTCP \
+        -e IP_NF_TARGET_ECN || true
+    fi
 
-          if [[ "${{ inputs.netfilter }}" == "true" ]]; then
-            echo "==> Forcing IPSET & IPv6_NAT to =y"
-            ./scripts/config --file "$CFG" \
-              -e BPF_STREAM_PARSER \
-              -e NETFILTER_XT_MATCH_ADDRTYPE \
-              -e NETFILTER_XT_SET \
-              -e IP_SET \
-              --set-val IP_SET_MAX 65534 \
-              -e IP_SET_BITMAP_IP \
-              -e IP_SET_BITMAP_IPMAC \
-              -e IP_SET_BITMAP_PORT \
-              -e IP_SET_HASH_IP \
-              -e IP_SET_HASH_IPMARK \
-              -e IP_SET_HASH_IPPORT \
-              -e IP_SET_HASH_IPPORTIP \
-              -e IP_SET_HASH_IPPORTNET \
-              -e IP_SET_HASH_IPMAC \
-              -e IP_SET_HASH_MAC \
-              -e IP_SET_HASH_NETPORTNET \
-              -e IP_SET_HASH_NET \
-              -e IP_SET_HASH_NETNET \
-              -e IP_SET_HASH_NETPORT \
-              -e IP_SET_HASH_NETIFACE \
-              -e IP_SET_LIST_SET \
-              -e IP6_NF_NAT \
-              -e IP6_NF_TARGET_MASQUERADE
-          fi
+    if [[ "${{ inputs.netfilter }}" == "true" ]]; then
+      echo "==> Forcing IPSET & IPv6_NAT to =y"
+      ./scripts/config --file "$CFG" \
+        -e NETFILTER_XT_MATCH_ADDRTYPE \
+        -e NETFILTER_XT_SET \
+        -e IP_SET \
+        --set-val IP_SET_MAX 65534 \
+        -e IP_SET_BITMAP_IP \
+        -e IP_SET_BITMAP_IPMAC \
+        -e IP_SET_BITMAP_PORT \
+        -e IP_SET_HASH_IP \
+        -e IP_SET_HASH_IPMARK \
+        -e IP_SET_HASH_IPPORT \
+        -e IP_SET_HASH_IPPORTIP \
+        -e IP_SET_HASH_IPPORTNET \
+        -e IP_SET_HASH_IPMAC \
+        -e IP_SET_HASH_MAC \
+        -e IP_SET_HASH_NETPORTNET \
+        -e IP_SET_HASH_NET \
+        -e IP_SET_HASH_NETNET \
+        -e IP_SET_HASH_NETPORT \
+        -e IP_SET_HASH_NETIFACE \
+        -e IP_SET_LIST_SET \
+        -e IP6_NF_NAT \
+        -e IP6_NF_TARGET_MASQUERADE
+    fi
 
-          make O=out olddefconfig
+    make O=out olddefconfig
+    
+    if [[ "${{ inputs.netfilter }}" == "true" ]]; then
+      echo "==> Verifying IPSET-related CONFIGs in $CFG"
+      fail=0
+      required_y=( IP_SET NETFILTER_XT_SET IP_SET_HASH_NET IP_SET_HASH_IP IP_SET_BITMAP_IP IP_SET_LIST_SET IP6_NF_NAT IP6_NF_TARGET_MASQUERADE NETFILTER_XT_MATCH_ADDRTYPE )
+      for s in "${required_y[@]}"; do
+        if ! grep -q "^CONFIG_${s}=y" "$CFG"; then
+          actual="$(grep "CONFIG_${s}[= ]" "$CFG" || echo 'NOT SET')"
+          echo "::error::CONFIG_${s} 未启用为 y  ->  ${actual}"
+          fail=1
+        fi
+      done
+      if [[ "$fail" -ne 0 ]]; then
+        echo "==> IPSET 关键配置启用失败，终止构建。"
+        mkdir -p "${GITHUB_WORKSPACE}/diag"
+        cp "$CFG" "${GITHUB_WORKSPACE}/diag/.config.failed" || true
+        ls -la "${GITHUB_WORKSPACE}/diag/" || true
+        exit 1
+      fi
+      echo "==> IPSET CONFIGs OK."
+    fi
 
-          echo "==> Verifying critical CONFIGs in $CFG"
-          fail=0
-          required_y=()
-          if [[ "${{ inputs.netfilter }}" == "true" ]]; then
-            required_y+=( IP_SET NETFILTER_XT_SET IP_SET_HASH_NET IP_SET_HASH_IP IP_SET_BITMAP_IP IP_SET_LIST_SET IP6_NF_NAT IP6_NF_TARGET_MASQUERADE NETFILTER_XT_MATCH_ADDRTYPE )
-          fi
-          if [[ "${{ inputs.ccm }}" == "true" ]]; then
-            required_y+=( TCP_CONG_BBR NET_SCH_FQ IP_ECN TCP_ECN IPV6_ECN )
-          fi
-          for s in "${required_y[@]}"; do
-            if ! grep -q "^CONFIG_${s}=y" "$CFG"; then
-              actual="$(grep "CONFIG_${s}[= ]" "$CFG" || echo 'NOT SET')"
-              echo "::error::CONFIG_${s} 未启用为 y  ->  ${actual}"
-              fail=1
-            fi
-          done
-          if [[ "$fail" -ne 0 ]]; then
-            echo "==> 关键配置启用失败，终止构建。完整 .config 已上传为 artifact 供排查。"
-            mkdir -p ../diag
-            cp "$CFG" ../diag/.config.failed
-            exit 1
-          fi
+    grep -E '^(CONFIG_IP_SET|CONFIG_NETFILTER_XT_SET|CONFIG_IP6_NF_NAT|CONFIG_TCP_CONG_BBR|CONFIG_NET_SCH_FQ)=' "$CFG" || true
 
-          echo "==> All required CONFIGs are =y. Proceeding to build Image."
-          grep -E '^(CONFIG_IP_SET|CONFIG_NETFILTER_XT_SET|CONFIG_IP6_NF_NAT|CONFIG_TCP_CONG_BBR|CONFIG_NET_SCH_FQ)=' "$CFG" || true
-
-          make -j$(nproc) O=out Image
-
-      - name: Upload failed .config (only on failure)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: failed-config
-          path: diag/.config.failed
-          if-no-files-found: ignore
-
+    make -j$(nproc) O=out Image
+    
       - name: Make AnyKernel3
         run: |
           ROM="${{ inputs.rom_source }}"
