@@ -225,6 +225,19 @@ jobs:
           fi
 
           make O=out gki_defconfig vendor/pineapple_GKI.config vendor/oplus/pineapple_GKI.config
+          
+      - name: Verify config
+        run: |
+        
+            cd sm8650
+            
+          echo "=== BBR ==="
+          grep -E "CONFIG_TCP_CONG_BBR|CONFIG_TCP_CONG_ADVANCED" out/.config || echo "❌ BBR NOT SET"
+          echo "=== IPSET ==="
+          grep -E "CONFIG_IP_SET[^_]|CONFIG_NETFILTER_XT_SET" out/.config || echo "❌ IPSET NOT SET"
+          echo "=== NETLINK ==="
+          grep -E "CONFIG_NETFILTER_NETLINK" out/.config || echo "❌ NETLINK NOT SET"
+    
           make -j$(nproc) O=out Image
 
       - name: Make AnyKernel3
