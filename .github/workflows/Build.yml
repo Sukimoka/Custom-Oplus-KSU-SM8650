@@ -158,6 +158,40 @@ jobs:
           # 应用 EVDI DRM 补丁
           patch -p1 -F 3 < ../patch/evdi_drm.patch || true
 
+      - name: Fix extract-cert key_pass compatibility
+        if: inputs.rom_source != 'YAAP'
+        run: |
+          cd sm8650
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("certs/extract-cert.c")
+          text = path.read_text()
+          guarded_decl = """#ifdef USE_PKCS11_ENGINE
+          static const char *key_pass;
+          #endif"""
+          guarded_assignment = """#ifdef USE_PKCS11_ENGINE
+          \tkey_pass = getenv("KBUILD_SIGN_PIN");
+          #endif"""
+          declaration = "static const char *key_pass;"
+          assignment = '\tkey_pass = getenv("KBUILD_SIGN_PIN");'
+
+          has_guarded_decl = guarded_decl in text
+          has_guarded_assignment = guarded_assignment in text
+          if has_guarded_decl and has_guarded_assignment:
+              text = text.replace(guarded_decl, declaration, 1)
+              text = text.replace(guarded_assignment, assignment, 1)
+              path.write_text(text)
+              print("Fixed extract-cert.c key_pass guards")
+          elif not has_guarded_decl and not has_guarded_assignment \
+                  and declaration in text and assignment in text:
+              print("extract-cert.c key_pass layout is already compatible")
+          else:
+              raise SystemExit(
+                  "Unsupported extract-cert.c layout: refusing key_pass fix"
+              )
+          PY
+
       - name: Compile Kernel
         run: |
           CLANG_ROOT="${GITHUB_WORKSPACE}/toolchains/clang-r563880c/bin"
