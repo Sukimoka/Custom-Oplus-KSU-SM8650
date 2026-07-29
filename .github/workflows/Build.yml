@@ -309,8 +309,7 @@ jobs:
           
           if [[ "${{ inputs.netfilter }}" == "true" ]]; then
             echo "Applying IPv6_NAT Fix..."
-            curl -LSsO https://raw.githubusercontent.com/Numbersf/Action-Build/SukiSU-Ultra/patches/IPv6_NAT_FIX.patch
-            patch -p1 -F 3 < IPv6_NAT_FIX.patch || true
+            git apply ../patch/ipv6fix.patch
           fi
           
           if [[ -n "${{ inputs.kernel_name }}" ]]; then
