@@ -8,7 +8,8 @@ on:
         required: true
         type: choice
         options:
-        - YAAP
+        - YAAP-16
+        - YAAP-17
         - LineageOS
         - Crdroid
         - PixelOS
@@ -86,9 +87,13 @@ jobs:
           
       - name: Clone Kernel Source and Download AOSP Clang
         run: |
-          if [[ "${{ inputs.rom_source }}" == "YAAP" ]]; then
+          if [[ "${{ inputs.rom_source }}" == "YAAP-16" ]]; then
             git clone --depth=1 -b sixteen https://github.com/AkiHaza/android_kernel_oneplus_sm8650.git sm8650
             git clone --depth=1 -b sixteen https://github.com/AkiHaza/android_kernel_oneplus_sm8650-modules.git sm8650-modules
+
+          elif [[ "${{ inputs.rom_source }}" == "YAAP-17" ]]; then
+            git clone --depth=1 -b seventeen https://github.com/AkiHaza/android_kernel_oneplus_sm8650.git sm8650
+            git clone --depth=1 -b seventeen https://github.com/AkiHaza/android_kernel_oneplus_sm8650-modules.git sm8650-modules
 
           elif [[ "${{ inputs.rom_source }}" == "LineageOS" ]]; then
             git clone --depth=1 -b lineage-23.2 https://github.com/LineageOS/android_kernel_oneplus_sm8650.git sm8650
@@ -110,14 +115,14 @@ jobs:
           tar -xf "linux-x86-refs_heads_android16-qpr2-release-clang-r563880c.tar.gz" -C clang-r563880c
 
       - name: Apply lz4 patch
-        if: inputs.lz4_enable && inputs.rom_source != 'YAAP'
+        if: inputs.lz4_enable && inputs.rom_source != 'YAAP-16' && inputs.rom_source != 'YAAP-17'
         run: |
           cd sm8650
           cp ../patch/lz4opt.S lib/
           git apply -p1 < ../patch/lz4.patch || true
 
       - name: Apply Droidspaces patches
-        if: inputs.droidspaces != 'none' && inputs.rom_source != 'YAAP'
+        if: inputs.droidspaces != 'none' && inputs.rom_source != 'YAAP-16' && inputs.rom_source != 'YAAP-17'
         run: |
           cd sm8650
           
@@ -144,7 +149,7 @@ jobs:
           patch -p1 -F 3 < ../patch/ntsync_compat_android14-6.1.patch || true
 
       - name: Apply Droidspaces Extended patches
-        if: inputs.droidspaces == 'extended' && inputs.rom_source != 'YAAP'
+        if: inputs.droidspaces == 'extended' && inputs.rom_source != 'YAAP-16' && inputs.rom_source != 'YAAP-17'
         run: |
           cd sm8650
           
@@ -160,7 +165,7 @@ jobs:
           patch -p1 -F 3 < ../patch/evdi_drm.patch || true
 
       - name: Fix extract-cert key_pass compatibility
-        if: inputs.rom_source != 'YAAP'
+        if: inputs.rom_source != 'YAAP-16'
         run: |
           cd sm8650
           python3 - <<'PY'
@@ -265,7 +270,7 @@ jobs:
           sed -i "s|CONFIG_MODULE_SIG_PROTECT=y|CONFIG_MODULE_SIG_PROTECT=n|" arch/arm64/configs/gki_defconfig
           echo "CONFIG_TMPFS_XATTR=y" >> arch/arm64/configs/gki_defconfig
 
-          if [[ "${{ inputs.rom_source }}" != "YAAP" ]]; then
+          if [[ "${{ inputs.rom_source }}" != "YAAP-16" && "${{ inputs.rom_source }}" != "YAAP-17" ]]; then
             echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> arch/arm64/configs/gki_defconfig
           fi
 
@@ -350,7 +355,7 @@ jobs:
             ZIP_PREFIX="${ZIP_PREFIX}-dss-ext"
           fi
           
-          ZIP_NAME="${ZIP_PREFIX}-$(date -u +"%m%d")"
+          ZIP_NAME="${{ inputs.rom_source }}-${ZIP_PREFIX}-$(date -u +"%m%d")"
           git clone --depth=1 https://github.com/Kernel-SU/AnyKernel3.git
           cp sm8650/out/arch/arm64/boot/Image AnyKernel3/Image
           cd AnyKernel3
@@ -359,7 +364,7 @@ jobs:
       - name: Upload ZIP artifact
         uses: actions/upload-artifact@v6
         with:
-          name: Kernel_ZIP
+          name: Kernel_ZIP_${{ inputs.rom_source }}
           path: "*.zip"
 
   release:
@@ -375,7 +380,7 @@ jobs:
       - name: Download ZIP artifact
         uses: actions/download-artifact@v7
         with:
-          name: Kernel_ZIP
+          name: Kernel_ZIP_${{ inputs.rom_source }}
           path: ./release_zips
 
       - name: Set release env

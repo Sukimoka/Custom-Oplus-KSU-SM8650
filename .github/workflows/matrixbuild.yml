@@ -30,7 +30,7 @@ jobs:
       checks: read
     strategy:
       matrix:
-        rom_source: [YAAP, Crdroid, LineageOS]
+        rom_source: [YAAP-17, Crdroid, LineageOS]
         ksu_type: [KernelSU-Next-susfs, ReSukiSU-susfs]
       fail-fast: false
 
@@ -49,9 +49,9 @@ jobs:
           
       - name: Clone Kernel Source and Download AOSP Clang
         run: |
-          if [[ "${{ matrix.rom_source }}" == "YAAP" ]]; then
-            git clone --depth=1 -b sixteen https://github.com/AkiHaza/android_kernel_oneplus_sm8650.git sm8650
-            git clone --depth=1 -b sixteen https://github.com/AkiHaza/android_kernel_oneplus_sm8650-modules.git sm8650-modules
+          if [[ "${{ matrix.rom_source }}" == "YAAP-17" ]]; then
+            git clone --depth=1 -b seventeen https://github.com/AkiHaza/android_kernel_oneplus_sm8650.git sm8650
+            git clone --depth=1 -b seventeen https://github.com/AkiHaza/android_kernel_oneplus_sm8650-modules.git sm8650-modules
           elif [[ "${{ matrix.rom_source }}" == "LineageOS" ]]; then
             git clone --depth=1 -b lineage-23.2 https://github.com/LineageOS/android_kernel_oneplus_sm8650.git sm8650
             git clone --depth=1 -b lineage-23.2 https://github.com/LineageOS/android_kernel_oneplus_sm8650-modules.git sm8650-modules
@@ -66,14 +66,14 @@ jobs:
           tar -xf "linux-x86-refs_heads_android16-qpr2-release-clang-r563880c.tar.gz" -C clang-r563880c
 
       - name: Apply lz4 patch
-        if: inputs.lz4_enable && matrix.rom_source != 'YAAP'
+        if: inputs.lz4_enable && matrix.rom_source != 'YAAP-17'
         run: |
           cd sm8650
           cp ../patch/lz4opt.S lib/
           git apply -p1 < ../patch/lz4.patch || true
 
       - name: Apply Droidspaces patches
-        if: inputs.droidspaces != 'none' && matrix.rom_source != 'YAAP'
+        if: inputs.droidspaces != 'none' && matrix.rom_source != 'YAAP-17'
         run: |
           cd sm8650
           
@@ -97,7 +97,7 @@ jobs:
           patch -p1 -F 3 < ../patch/ntsync_compat_android14-6.1.patch || true
 
       - name: Apply Droidspaces Extended patches
-        if: inputs.droidspaces == 'extended' && matrix.rom_source != 'YAAP'
+        if: inputs.droidspaces == 'extended' && matrix.rom_source != 'YAAP-17'
         run: |
           cd sm8650
           
@@ -109,7 +109,7 @@ jobs:
           patch -p1 -F 3 < ../patch/evdi_drm.patch || true
 
       - name: Fix extract-cert key_pass compatibility
-        if: matrix.rom_source != 'YAAP'
+        if: matrix.rom_source != 'YAAP-16'
         run: |
           cd sm8650
           python3 - <<'PY'
@@ -202,7 +202,7 @@ jobs:
           sed -i "s|CONFIG_MODULE_SIG_PROTECT=y|CONFIG_MODULE_SIG_PROTECT=n|" arch/arm64/configs/gki_defconfig
           echo "CONFIG_TMPFS_XATTR=y" >> arch/arm64/configs/gki_defconfig
 
-          if [[ "${{ matrix.rom_source }}" != "YAAP" ]]; then
+          if [[ "${{ matrix.rom_source }}" != "YAAP-17" ]]; then
             echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> arch/arm64/configs/gki_defconfig
           fi
 
@@ -313,7 +313,7 @@ jobs:
             
             | Field | Value |
             |---|---|
-            |    ROM 支持   | YAAP, Crdroid, PixelOS, LineageOS |
+            |    ROM 支持   | YAAP-17, Crdroid, LineageOS |
             | KernelSU 方案 |      KernelSUNext, ReSukiSU       |
             |   Build时间   |       ${{ env.TIME_FORM }}        |
 

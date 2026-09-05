@@ -10,7 +10,8 @@
 ## 功能特性
 
 - 支持多个 ROM 内核源码：
-  - YAAP
+  - YAAP-16
+  - YAAP-17
   - LineageOS
   - crDroid
   - PixelOS
@@ -21,7 +22,7 @@
   - 上述方案的 SUSFS 变体（部分组合）
   - 不集成 KernelSU
 - 可选功能：
-  - LZ4 1.10.0 补丁（YAAP 源码不应用）
+  - LZ4 1.10.0 补丁（YAAP-16/YAAP-17 源码不应用）
   - BBR、ECN 与 FQ 队列调度
   - IPSet 与 IPv6 NAT
   - Droidspaces 容器支持
@@ -46,12 +47,12 @@
 
 | 参数 | 说明 |
 |---|---|
-| `ROM Kernel Source Code` | 选择内核源码：`YAAP`、`LineageOS`、`Crdroid` 或 `PixelOS`。 |
+| `ROM Kernel Source Code` | 选择内核源码：`YAAP-16`、`YAAP-17`、`LineageOS`、`Crdroid` 或 `PixelOS`。 |
 | `KernelSU Version` | 选择 KernelSU 集成方案，或选择 `None` 构建非 KernelSU 内核。 |
-| `Enable lz4 1.10.0 patch` | 为非 YAAP 源码应用 LZ4 1.10.0 补丁。 |
+| `Enable lz4 1.10.0 patch` | 为非 YAAP-16/YAAP-17 源码应用 LZ4 1.10.0 补丁。 |
 | `Enable IPSET & IPv6_NAT` | 启用 IPSet、IPv6 NAT 及相关 Netfilter 配置。 |
 | `Enable BBR & ECN` | 启用 BBR、ECN 与 FQ。 |
-| `Droidspaces Container Support` | 选择 `none`、`standard` 或 `extended` 容器支持。YAAP 源码不会应用 Droidspaces 补丁。 |
+| `Droidspaces Container Support` | 选择 `none`、`standard` 或 `extended` 容器支持。YAAP-16/YAAP-17 源码不会应用 Droidspaces 补丁。 |
 | `Custom Kernel Name` | 设置内核附加版本名。脚本会自动补上 `-` 前缀。 |
 | `创建 GitHub Release？` | 是否在构建成功后创建并上传 GitHub Release。 |
 
@@ -59,9 +60,12 @@
 
 单独构建工作流使用以下上游与分支：
 
+矩阵构建工作流固定使用 `YAAP-17`，不再构建 `YAAP-16`。
+
 | ROM 源码 | Kernel 仓库 / 分支 | Modules 仓库 / 分支 |
 |---|---|---|
-| YAAP | [`AkiHaza/android_kernel_oneplus_sm8650`](https://github.com/AkiHaza/android_kernel_oneplus_sm8650) / `sixteen` | [`AkiHaza/android_kernel_oneplus_sm8650-modules`](https://github.com/AkiHaza/android_kernel_oneplus_sm8650-modules) / `sixteen` |
+| YAAP-16 | [`AkiHaza/android_kernel_oneplus_sm8650`](https://github.com/AkiHaza/android_kernel_oneplus_sm8650) / `sixteen` | [`AkiHaza/android_kernel_oneplus_sm8650-modules`](https://github.com/AkiHaza/android_kernel_oneplus_sm8650-modules) / `sixteen` |
+| YAAP-17 | [`AkiHaza/android_kernel_oneplus_sm8650`](https://github.com/AkiHaza/android_kernel_oneplus_sm8650) / `seventeen` | [`AkiHaza/android_kernel_oneplus_sm8650-modules`](https://github.com/AkiHaza/android_kernel_oneplus_sm8650-modules) / `seventeen` |
 | LineageOS | [`LineageOS/android_kernel_oneplus_sm8650`](https://github.com/LineageOS/android_kernel_oneplus_sm8650) / `lineage-23.2` | [`LineageOS/android_kernel_oneplus_sm8650-modules`](https://github.com/LineageOS/android_kernel_oneplus_sm8650-modules) / `lineage-23.2` |
 | crDroid | [`crdroidandroid/android_kernel_oneplus_sm8650`](https://github.com/crdroidandroid/android_kernel_oneplus_sm8650) / `16.0` | [`crdroidandroid/android_kernel_oneplus_sm8650-modules`](https://github.com/crdroidandroid/android_kernel_oneplus_sm8650-modules) / `16.0` |
 | PixelOS | [`PixelOS-Devices/android_kernel_oneplus_sm8650`](https://github.com/PixelOS-Devices/android_kernel_oneplus_sm8650) / `sixteen-qpr2` | [`PixelOS-Devices/android_kernel_oneplus_sm8650-modules`](https://github.com/PixelOS-Devices/android_kernel_oneplus_sm8650-modules) / `sixteen-qpr2` |
@@ -97,14 +101,14 @@
 | `extended` | 在标准支持基础上，额外启用虚拟 HCI、Lindroid EVDI DRM，以及相关扩展配置。 |
 
 > [!NOTE]
-> Droidspaces 补丁仅会应用于非 YAAP 源码。
+> Droidspaces 补丁仅会应用于非 YAAP-16/YAAP-17 源码。
 
 ## 输出文件命名
 
 单独构建的 ZIP 大致遵循：
 
 ```text
-<KSU 方案>[-dss|-dss-ext]-<UTC 月日>.zip
+<ROM 源码>-<KSU 方案>[-dss|-dss-ext]-<UTC 月日>.zip
 ```
 
 其中：
