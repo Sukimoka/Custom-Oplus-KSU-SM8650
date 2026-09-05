@@ -27,7 +27,7 @@
   - IPSet 与 IPv6 NAT
   - Droidspaces 容器支持
   - Droidspaces Extended：额外启用虚拟 HCI、systemd-coredump 相关配置及 Lindroid EVDI DRM
-- 使用 AOSP Clang `r563880c` 编译
+- 使用 AOSP Clang 编译：YAAP-17 使用 `clang-r596125`，其他源码使用 `clang-r563880c`
 - 通过 AnyKernel3 输出可刷写 ZIP
 - 支持上传 Actions Artifact，并可自动创建 GitHub Release
 
@@ -61,6 +61,8 @@
 单独构建工作流使用以下上游与分支：
 
 矩阵构建工作流固定使用 `YAAP-17`，不再构建 `YAAP-16`。
+
+YAAP-17 使用的 Clang 归档直链：[`clang-r596125.tar.gz`](https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android17-release/clang-r596125.tar.gz)
 
 | ROM 源码 | Kernel 仓库 / 分支 | Modules 仓库 / 分支 |
 |---|---|---|
@@ -127,7 +129,7 @@ sudo apt install -y \
   lz4 git python3 curl dwarves cpio gcc-aarch64-linux-gnu
 ```
 
-编译时使用 AOSP Clang `r563880c`，并执行：
+编译时 YAAP-17 使用 AOSP Clang `clang-r596125`，其他源码使用 `clang-r563880c`，并执行：
 
 ```bash
 make O=out gki_defconfig vendor/pineapple_GKI.config vendor/oplus/pineapple_GKI.config

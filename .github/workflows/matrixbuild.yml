@@ -60,10 +60,24 @@ jobs:
             git clone --depth=1 -b 16.0 https://github.com/crdroidandroid/android_kernel_oneplus_sm8650-modules.git sm8650-modules
           fi
 
-          mkdir -p toolchains/clang-r563880c
+          if [[ "${{ matrix.rom_source }}" == "YAAP-17" ]]; then
+            CLANG_VERSION="clang-r596125"
+            CLANG_URL="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android17-release/clang-r596125.tar.gz"
+          else
+            CLANG_VERSION="clang-r563880c"
+            CLANG_URL="https://github.com/AkiHaza/Floran-Kernel/releases/download/toolchain-r563880c/linux-x86-refs_heads_android16-qpr2-release-clang-r563880c.tar.gz"
+          fi
+
+          mkdir -p "toolchains/${CLANG_VERSION}"
           cd toolchains
-          curl -LO https://github.com/AkiHaza/Floran-Kernel/releases/download/toolchain-r563880c/linux-x86-refs_heads_android16-qpr2-release-clang-r563880c.tar.gz
-          tar -xf "linux-x86-refs_heads_android16-qpr2-release-clang-r563880c.tar.gz" -C clang-r563880c
+          echo "Downloading ${CLANG_VERSION} from ${CLANG_URL}"
+          curl -fL --retry 3 --retry-delay 2 -o "${CLANG_VERSION}.tar.gz" "${CLANG_URL}"
+          tar -xf "${CLANG_VERSION}.tar.gz" -C "${CLANG_VERSION}"
+          {
+            echo "### Clang toolchain"
+            echo "- Version: ${CLANG_VERSION}"
+            echo "- Download: ${CLANG_URL}"
+          } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Apply lz4 patch
         if: inputs.lz4_enable && matrix.rom_source != 'YAAP-17'
@@ -144,13 +158,19 @@ jobs:
 
       - name: Compile Kernel
         run: |
-          CLANG_ROOT="${GITHUB_WORKSPACE}/toolchains/clang-r563880c/bin"
+          if [[ "${{ matrix.rom_source }}" == "YAAP-17" ]]; then
+            CLANG_VERSION="clang-r596125"
+          else
+            CLANG_VERSION="clang-r563880c"
+          fi
+          CLANG_ROOT="${GITHUB_WORKSPACE}/toolchains/${CLANG_VERSION}/bin"
           export PATH="${CLANG_ROOT}:$PATH"
           export ARCH=arm64
           export SUBARCH=arm64
           export LLVM=1
           export LLVM_IAS=1
           export CC=clang CXX=clang++ HOSTCC=clang HOSTCXX=clang++ LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip
+          echo "Using ${CLANG_VERSION}: $(clang --version | head -n 1)"
 
           cd sm8650
 
@@ -314,6 +334,7 @@ jobs:
             | Field | Value |
             |---|---|
             |    ROM 支持   | YAAP-17, Crdroid, LineageOS |
+            | Clang | [YAAP-17 clang-r596125](https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android17-release/clang-r596125.tar.gz); Crdroid/LineageOS [clang-r563880c](https://github.com/AkiHaza/Floran-Kernel/releases/download/toolchain-r563880c/linux-x86-refs_heads_android16-qpr2-release-clang-r563880c.tar.gz) |
             | KernelSU 方案 |      KernelSUNext, ReSukiSU       |
             |   Build时间   |       ${{ env.TIME_FORM }}        |
 
